@@ -1,7 +1,9 @@
 using Profile;
 using Tool;
 using UnityEngine;
+using UnityEngine.Analytics;
 using Object = UnityEngine.Object;
+using Services;
 
 namespace Ui
 {
@@ -16,8 +18,18 @@ namespace Ui
         {
             _profilePlayer = profilePlayer;
             _view = LoadView(placeForUi);
-            _view.InitStart(StartGame);
-            _view.InitSettings(ToSettings);
+            _view.Init(StartGame, ToSettings, PlayRewardedAds, BuyProduct);
+
+            ServicesSingltone.AnalyticsManager.SendMainMenuOpendEvent();
+
+            SubscribeAds();
+            SubscribeIAP();
+        }
+
+        protected override void OnDispose()
+        {
+            UnSubscribeAds();
+            UnSubscribeIAP();
         }
 
 
@@ -35,5 +47,45 @@ namespace Ui
 
         private void ToSettings() =>
             _profilePlayer.CurrentState.Value = GameState.Settings;
+
+        private void PlayRewardedAds() =>
+            ServicesSingltone.AdsService.RewardedPlayer.Play();
+
+        private void BuyProduct(string productId) =>
+            ServicesSingltone.IapService.Buy(productId);
+
+        private void SubscribeAds()
+        {
+            ServicesSingltone.AdsService.RewardedPlayer.Finished += OnAdsFinished;
+            ServicesSingltone.AdsService.RewardedPlayer.Skipped += OnAdsCanceled;
+            ServicesSingltone.AdsService.RewardedPlayer.Failed += OnAdsCanceled;
+        }
+
+        private void UnSubscribeAds()
+        {
+            ServicesSingltone.AdsService.RewardedPlayer.Finished -= OnAdsFinished;
+            ServicesSingltone.AdsService.RewardedPlayer.Skipped -= OnAdsCanceled;
+            ServicesSingltone.AdsService.RewardedPlayer.Failed -= OnAdsCanceled;
+        }
+
+        private void SubscribeIAP()
+        {
+            ServicesSingltone.IapService.PurchaseSucceed.AddListener(OnAIPSucceed);
+            ServicesSingltone.IapService.PurchaseFailed.AddListener(OnAIPFailed);
+        }
+
+        private void UnSubscribeIAP()
+        {
+            ServicesSingltone.IapService.PurchaseSucceed.RemoveListener(OnAIPSucceed);
+            ServicesSingltone.IapService.PurchaseFailed.RemoveListener(OnAIPFailed);
+        }
+
+        private void OnAIPSucceed() => Debug.Log("Purchase succeed");
+
+        private void OnAIPFailed() => Debug.Log("Purchase failed");
+
+        private void OnAdsFinished() => Debug.Log("Ads viewed, good job!");
+
+        private void OnAdsCanceled() => Debug.Log("Some problems with ads");
     }
 }
